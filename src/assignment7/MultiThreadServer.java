@@ -103,6 +103,7 @@ public class MultiThreadServer extends Application
 					globalChat.postMessage(messageReceived);
 				}
 			} catch(IOException e) {
+				chatRooms.get(0).postMessage(user.getName()+" has left the room.");
 				e.printStackTrace();
 			}
 		}

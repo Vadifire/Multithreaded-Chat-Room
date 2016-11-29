@@ -20,7 +20,8 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage; 
+import javafx.stage.Stage;
+import javafx.stage.WindowEvent; 
 
 
 public class Client extends Application{ 
@@ -49,13 +50,18 @@ public class Client extends Application{
 		
 		hbox.getChildren().add(vbox1);
 		
-		Scene s = new Scene(login , 160, 40);
-		primaryStage.setScene(s);
+		Scene loginScene = new Scene(login , 200, 40);
+		primaryStage.setScene(loginScene);
 		primaryStage.setX(10);
 		primaryStage.setY(10);
 		primaryStage.setTitle("Login:");
+		primaryStage.setResizable(false);
+		primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>() {
+		    @Override public void handle(WindowEvent t) {
+		    	System.exit(0);
+		    }
+		});
 		primaryStage.show();
-		
 		
 		messageInput.setOnKeyPressed(new EventHandler<KeyEvent>() {
 			@Override
@@ -80,19 +86,6 @@ public class Client extends Application{
 					login.setStyle("-fx-text-fill: black;");
 					login.setText("");
 				}
-				Platform.runLater(new Runnable(){
-					@Override
-					public void run() {
-						while (true){
-							try {
-								messageLog.appendText(fromServer.readUTF());
-							} catch (IOException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-						}
-					}
-				});
 			}
 		});
 		
@@ -101,13 +94,19 @@ public class Client extends Application{
 			public void handle(KeyEvent event) {
 				if (event.getCode() == KeyCode.ENTER){
 					username = login.getText();
-					try {
-						toServer.writeUTF(username);
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
+					if (username.length() > 0){
+						try {
+							primaryStage.setTitle("Global Chatroom:");
+							toServer.writeUTF(username);
+							ReadThread readThread = new ReadThread(fromServer);
+							readThread.start();
+							toServer.writeUTF(username+" has joined the room.");
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						primaryStage.setScene(chatScene);
 					}
-					primaryStage.setScene(chatScene);
 				}
 			}
 		});
@@ -134,4 +133,28 @@ public class Client extends Application{
 	public static void main(String[] args) {
 		launch(args);
 	}
+	
+	class ReadThread extends Thread{
+		
+		DataInputStream fromServer;
+		
+		public ReadThread(DataInputStream fromServer){
+			this.fromServer = fromServer;
+		}
+		
+		public void run(){
+			while (true){
+				String message;
+				try {
+					message = fromServer.readUTF();
+					messageLog.appendText(message+"\n");
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+
+	
 }
