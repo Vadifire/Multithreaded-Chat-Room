@@ -33,6 +33,11 @@ public class User {
 		if (!chatRooms.contains(cr))
 			chatRooms.add(cr);
 	}
+	
+	public void leaveRoom(ChatRoom cr){
+		if (chatRooms.contains(cr))
+			chatRooms.remove(cr);
+	}
 
 	/**
 	 * @return the name

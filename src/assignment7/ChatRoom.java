@@ -30,10 +30,19 @@ public class ChatRoom extends Observable{
 		return id;
 	}
 	
+	public void removeUser(User u, HandleAClient hac){
+		if (users.contains(u)){
+			users.remove(u);
+			this.deleteObserver(hac);
+			u.leaveRoom(this);
+		}
+	}
+	
 	public void addUser(User u, HandleAClient hac){
 		if (!users.contains(u)){
 			users.add(u);
 			this.addObserver(hac);
+			u.joinRoom(this);
 		}
 	}
 }

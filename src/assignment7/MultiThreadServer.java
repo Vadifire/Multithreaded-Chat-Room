@@ -114,6 +114,13 @@ public class MultiThreadServer extends Application { // Text area for displaying
 								chat.postMessage("Say hello, " + user.getName() + " and " + u.getName() + "!");
 							}
 						}
+					} else if (code.equals("EXIT")) {						
+						code = messageReceived.substring(4,8); //extracts room code
+						value = messageReceived.substring(8); //value gets shifted as well
+						ChatRoom c = chatRooms.get(Integer.parseInt(code));
+						User u = users.get(value);
+						c.removeUser(this.user, this);
+						c.postMessage(value);
 					} else {
 						ChatRoom c = chatRooms.get(Integer.parseInt(code));
 						c.postMessage(String.format("(%tT) ", Calendar.getInstance()) + user.getName() + ": "

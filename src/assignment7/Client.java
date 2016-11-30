@@ -117,7 +117,7 @@ public class Client extends Application {
 		try {
 			toServer.writeUTF(username);
 			// System.out.println("Wrote " + username);
-			ChatWindow globalChat = new ChatWindow("Global", 0);
+			ChatWindow globalChat = new ChatWindow("Global", 0, username);
 
 			chats.put(fromServer.readInt(), globalChat);
 
@@ -174,12 +174,19 @@ public class Client extends Application {
 				try {
 					String message = fromServer.readUTF();
 					int chatID = Integer.parseInt(message.substring(0, 4));
-					if (!chats.containsKey(chatID))
-						Platform.runLater(() -> {
-							chats.put(chatID, new ChatWindow("ABBA", chatID));
+					System.out.println("chatID is: "+chatID);
+					if (!chats.containsKey(chatID)){
+						Platform.runLater( () -> {
+							ChatWindow newWindow = new ChatWindow("Private Chat", chatID, username);
+							chats.put(chatID, newWindow);
+							newWindow.outbox.addObserver(new Writer(toServer, newWindow));
 							chats.get(chatID).addText(message.substring(4));
 						});
-
+					}
+					else{
+						System.out.println("adding text");
+						chats.get(chatID).addText(message.substring(4));
+					}
 					System.out
 							.println("MESSAGES RECEIVED FROM SERVER: " + message + " AND ALSO " + message.substring(4));
 					// inb.add(message.substring(4));
@@ -237,16 +244,18 @@ public class Client extends Application {
 		Box<String> outbox;
 		int chatID;
 		Label l;
+		private String username;
 
 		public void addText(String message) {
 			ta.appendText(message + "\n");
 		}
 
-		public ChatWindow(String name, int ID) {
+		public ChatWindow(String name, int ID, String username) {
 			friendChat = new TextField("Chat With...");
 			inbox = new Box<String>();
 			outbox = new Box<String>();
 			this.chatID = ID;
+			this.username = username;
 
 			ta = new TextArea();
 			content = new HBox();
@@ -261,7 +270,7 @@ public class Client extends Application {
 			content.getChildren().add(messageArea);
 			content.getChildren().add(friendChat);
 
-			scene = new Scene(content, 800, 400);
+			scene = new Scene(content, 660, 330);
 			window = new Stage();
 			window.setScene(scene);
 			window.setTitle(name);
@@ -272,6 +281,7 @@ public class Client extends Application {
 			window.setOnCloseRequest(new EventHandler<WindowEvent>() {
 				@Override
 				public void handle(WindowEvent arg0) {
+					outbox.add("EXIT"+String.format("%04d", chatID) + username+ " has left the room.");
 					window.hide();
 				}
 
@@ -296,12 +306,13 @@ public class Client extends Application {
 					friendChat.setText("");
 				}
 			});
-
+			
 			messageInput.setOnKeyPressed(new EventHandler<KeyEvent>() {
 				@Override
 				public void handle(KeyEvent event) {
 					if (event.getCode() == KeyCode.ENTER) {
 						if (!messageInput.getText().equals("")) {
+							System.out.println("adding message to outbox");
 							outbox.add(String.format("%04d", chatID) + messageInput.getText());
 						}
 						messageInput.setText("");
