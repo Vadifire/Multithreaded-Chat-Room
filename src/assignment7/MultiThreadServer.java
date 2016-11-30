@@ -48,14 +48,11 @@ public class MultiThreadServer extends Application { // Text area for displaying
 				while (true) {
 					// Listen for a new connection request
 					Socket socket = serverSocket.accept();
-
 					// Increment clientNo
 					clientNo++;
-
 					Platform.runLater(() -> {
 						// Display the client number
 						ta.appendText("Starting thread for client " + clientNo + " at " + new Date() + '\n');
-
 						// Find the client's host name, and IP address
 						InetAddress inetAddress = socket.getInetAddress();
 						ta.appendText("Client " + clientNo + "'s host name is " + inetAddress.getHostName() + "\n");
@@ -81,7 +78,6 @@ public class MultiThreadServer extends Application { // Text area for displaying
 
 		/** Construct a thread */
 		public HandleAClient(Socket socket) {
-
 			this.socket = socket;
 		}
 
@@ -92,6 +88,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 				inputFromClient = new DataInputStream(socket.getInputStream());
 				outputToClient = new DataOutputStream(socket.getOutputStream());
 
+				//Get username and initialize user object
 				String username = inputFromClient.readUTF();
 				user = new User(username);
 				users.put(username, user);
@@ -108,6 +105,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 					} else {
 						globalChat.postMessage(String.format("(%tT) ", Calendar.getInstance()) + user.getName() + ": "
 								+ messageReceived.substring(4));
+						
 					}
 				}
 			} catch (IOException e) {
@@ -131,7 +129,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 	}
 
 	public static void main(String[] args) {
-		chatRooms.putIfAbsent(globalChat.getId(), globalChat); // Global chat
+		chatRooms.put(globalChat.getId(), globalChat); // Global chat
 																// room (id 0)
 		launch(args);
 	}

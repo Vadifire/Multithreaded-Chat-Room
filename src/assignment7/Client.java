@@ -2,17 +2,14 @@ package assignment7;
 
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Map.Entry;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.Queue;
 
 import javafx.application.Application;
-import javafx.application.Platform;
 import javafx.event.EventHandler;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -23,7 +20,6 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -119,58 +115,53 @@ public class Client extends Application {
 	private void login(String username) {
 		try {
 			toServer.writeUTF(username);
-			System.out.println("Wrote " + username);
-			ChatWindow globalChat = new ChatWindow("Global");
+			// System.out.println("Wrote " + username);
+			ChatWindow globalChat = new ChatWindow("Global", 0);
 
 			chats.put(fromServer.readInt(), globalChat);
 
 			toServer.writeUTF(username + " has joined the room.");
 
-			new ReadThread(fromServer, chats).start();
-			new WriteThread(toServer, chats).start();
-			new GuiHandler(globalChat).start();
+			new Reader(fromServer, chats).start();
+			globalChat.outbox.addObserver(new Writer(toServer, globalChat));
+			//globalChat.inbox.addObserver(new GuiHandler(globalChat));
 		} catch (IOException e) {
 		}
-
 	}
 
 	public static void main(String[] args) {
 		launch(args);
 	}
 
-	class WriteThread extends Thread {
+	class Writer implements Observer {
 		DataOutputStream toServer;
-		HashMap<Integer, ChatWindow> chats;
+		ChatWindow chat;
 
-		public WriteThread(DataOutputStream toServer, HashMap<Integer, ChatWindow> chats) {
+		public Writer(DataOutputStream toServer, ChatWindow chat) {
 			this.toServer = toServer;
-			this.chats = chats;
+			this.chat = chat;
 		}
 
-		public void run() {
-			boolean done = false;
-			while (!done) {
-				for (Entry<Integer, ChatWindow> m : chats.entrySet()) {
-					while (!m.getValue().outbox.isEmpty()) {
-						try {
-							String toWrite = String.format("%04d", m.getKey()) + m.getValue().outbox.poll();
-							toServer.writeUTF(toWrite);
-						} catch (Exception e) {
-							done = true;
-							e.printStackTrace();
-						}
-					}
+		@Override
+		public void update(Observable o, Object arg) {
+			Box out = (Box) o;
+			while (!out.isEmpty()) {
+				try {
+					toServer.writeUTF(String.format("%04d", chat.chatID) + out.poll());
+					toServer.flush();
+				} catch (Exception e) {
+					e.printStackTrace();
 				}
 			}
 		}
 	}
 
-	class ReadThread extends Thread {
+	class Reader extends Thread {
 
 		DataInputStream fromServer;
 		HashMap<Integer, ChatWindow> chats;
 
-		public ReadThread(DataInputStream fromServer, HashMap<Integer, ChatWindow> chats) {
+		public Reader(DataInputStream fromServer, HashMap<Integer, ChatWindow> chats) {
 			this.fromServer = fromServer;
 			this.chats = chats;
 		}
@@ -182,7 +173,8 @@ public class Client extends Application {
 				try {
 					message = fromServer.readUTF();
 					int chatID = Integer.parseInt(message.substring(0, 3));
-					chats.get(chatID).inbox.add(message.substring(4));
+					chats.get(chatID).addText(message.substring(4));
+					//inb.add(message.substring(4));
 				} catch (Exception e) {
 					done = true;
 					e.printStackTrace();
@@ -190,80 +182,125 @@ public class Client extends Application {
 			}
 		}
 	}
-
-	class GuiHandler extends Thread {
+/*
+	class GuiHandler implements Observer {
 		ChatWindow chat;
 
 		public GuiHandler(ChatWindow chat) {
 			this.chat = chat;
 		}
 
-		public void run() {
-			while (true) {
-				while (!chat.inbox.isEmpty()) {
-					chat.addText(chat.inbox.poll());
-				}
+		@Override
+		public void update(Observable o, Object arg) {
+			Box inb = (Box) o;
+			String message = (String) arg;
+			while(!inb.isEmpty()){
+				chat.addText(message);
 			}
 		}
+
 	}
-}
+*/
+	class Box<T> extends Observable {
+		Queue<T> queue;
 
-class ChatWindow {
-	private Stage window;
-	private Scene scene;
-	private HBox content;
-	private TextArea ta;
-	Queue<String> inbox;
-	Queue<String> outbox;
-	Label l;
+		public Box() {
+			queue = new LinkedList<T>();
+		}
 
-	public void addText(String message) {
-		ta.appendText(message + "\n");
+		public boolean isEmpty() {
+			return queue.isEmpty();
+		}
+
+		public T poll() {
+//			System.out.println("MESSAGE " + queue.peek() + " READ FROM INBOX");
+			return queue.poll();
+		}
+
+		public void add(T value) {
+			queue.add(value);
+//			System.out.println("MESSAGE " + value + " PUT IN OUTBOX");
+			this.setChanged();
+			this.notifyObservers();
+		}
 	}
 
-	public ChatWindow(String name) {
-		l = new Label("LABEL");
-		inbox = new LinkedList<String>();
-		outbox = new LinkedList<String>();
-		ta = new TextArea();
-		content = new HBox();
-		VBox messageArea = new VBox();
+	class ChatWindow {
+		private Stage window;
+		private Scene scene;
+		private HBox content;
+		private TextArea ta;
+		private TextField friendChat;
+		Box<String> inbox;
+		Box<String> outbox;
+		Box<String> friendRequests;
+		int chatID;
+		Label l;
 
-		ta.setEditable(false);
-		ScrollPane scrollPane = new ScrollPane(ta);
-		scrollPane.setHbarPolicy(ScrollBarPolicy.NEVER);
-		messageArea.getChildren().add(scrollPane);
-		TextField messageInput = new TextField();
-		messageArea.getChildren().add(messageInput);
-		content.getChildren().add(messageArea);
-		content.getChildren().add(l);
+		public void addText(String message) {
+			ta.appendText(message + "\n");
+		}
 
-		scene = new Scene(content, 800, 400);
-		window = new Stage();
-		window.setScene(scene);
-		window.setTitle(name);
-		window.setX(10);
-		window.setY(10);
-		window.show();
+		public ChatWindow(String name, int ID) {
+			friendChat = new TextField("Chat With...");
+			inbox = new Box<String>();
+			outbox = new Box<String>();
+			this.chatID = ID;
 
-		window.setOnCloseRequest(new EventHandler<WindowEvent>() {
-			@Override
-			public void handle(WindowEvent arg0) {
-				window.hide();
-			}
+			ta = new TextArea();
+			content = new HBox();
+			VBox messageArea = new VBox();
 
-		});
+			ta.setEditable(false);
+			ScrollPane scrollPane = new ScrollPane(ta);
+			scrollPane.setHbarPolicy(ScrollBarPolicy.NEVER);
+			messageArea.getChildren().add(scrollPane);
+			TextField messageInput = new TextField();
+			messageArea.getChildren().add(messageInput);
+			content.getChildren().add(messageArea);
 
-		messageInput.setOnKeyPressed(new EventHandler<KeyEvent>() {
-			@Override
-			public void handle(KeyEvent event) {
-				if (event.getCode() == KeyCode.ENTER) {
-					if (!messageInput.getText().equals("")) {
-						outbox.add(messageInput.getText());
-					}
-					messageInput.setText("");
+			scene = new Scene(content, 800, 400);
+			window = new Stage();
+			window.setScene(scene);
+			window.setTitle(name);
+			window.setX(10);
+			window.setY(10);
+			window.show();
+
+			window.setOnCloseRequest(new EventHandler<WindowEvent>() {
+				@Override
+				public void handle(WindowEvent arg0) {
+					window.hide();
 				}
-			}
-		});
+
+			});
+
+			friendChat.setOnKeyPressed(new EventHandler<KeyEvent>() {
+				@Override
+				public void handle(KeyEvent arg0) {
+
+				}
+			});
+
+			friendChat.setOnMouseClicked(new EventHandler<MouseEvent>() {
+
+				@Override
+				public void handle(MouseEvent event) {
+					friendChat.setText("");
+				}
+			});
+
+			messageInput.setOnKeyPressed(new EventHandler<KeyEvent>() {
+				@Override
+				public void handle(KeyEvent event) {
+					if (event.getCode() == KeyCode.ENTER) {
+						if (!messageInput.getText().equals("")) {
+							outbox.add(chatID + messageInput.getText());
+						}
+						messageInput.setText("");
+					}
+				}
+			});
+		}
 	}
 }
