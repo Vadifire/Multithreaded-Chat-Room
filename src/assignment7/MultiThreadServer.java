@@ -44,6 +44,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 			try { // Create a server socket
 				ServerSocket serverSocket = new ServerSocket(8000);
 				ta.appendText("MultiThreadServer started at " + new Date() + '\n');
+				
 
 				while (true) {
 					// Listen for a new connection request
@@ -67,7 +68,6 @@ public class MultiThreadServer extends Application { // Text area for displaying
 			}
 		}).start();
 	}
-
 	// Define the thread class for handling
 	class HandleAClient implements Runnable, Observer {
 
@@ -90,7 +90,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 
 				//Get username and initialize user object
 				String username = inputFromClient.readUTF();
-				user = new User(username);
+				user = new User(username, this);
 				users.put(username, user);
 				globalChat.addObserver(this);
 				user.joinRoom(globalChat);
@@ -100,11 +100,25 @@ public class MultiThreadServer extends Application { // Text area for displaying
 				// Continuously serve the client
 				while (true) {
 					String messageReceived = inputFromClient.readUTF();
-					if (messageReceived.equals("FRIENDS")) {
-						
+					String code = messageReceived.substring(0, 4);
+					String value = messageReceived.substring(4);
+					
+					if (code.equals("FRND")) {						
+						if(users.containsKey(value)){
+							User u = users.get(value);
+							if(!(u.isChattingWith(this.user))){
+								ChatRoom chat = new ChatRoom();
+								chat.addUser(u, u.getHandler());
+								chat.addUser(this.user, this);
+								chatRooms.put(chat.getId(), chat);
+								chat.postMessage("Say hello, " + user.getName() + " and " + u.getName() + "!");
+							}
+						}
 					} else {
-						globalChat.postMessage(String.format("(%tT) ", Calendar.getInstance()) + user.getName() + ": "
-								+ messageReceived.substring(4));
+						ChatRoom c = chatRooms.get(Integer.parseInt(code));
+						c.postMessage(String.format("(%tT) ", Calendar.getInstance()) + user.getName() + ": "
+								+ value);
+						System.out.println("MESSAGE RECEIVED FROM CLIENT: " + messageReceived);
 						
 					}
 				}
@@ -120,6 +134,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 			String newMessage = (String) arg1;
 			try {
 				outputToClient.writeUTF(String.format("%04d", chatId) + newMessage);
+				System.out.println("MESSAGES SENT FROM SERVER: "+ newMessage + " AND ALSO " + String.format("%04d", chatId) + newMessage);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

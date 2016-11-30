@@ -16,6 +16,10 @@ public class ChatRoom extends Observable{
 		id = nextId++;
 	}
 	
+	public boolean hasUser(User u){
+		return users.contains(u);
+	}
+	
 	public void postMessage(String message){
 		newMessage = message;
 		this.setChanged();

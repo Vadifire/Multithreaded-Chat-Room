@@ -2,20 +2,31 @@ package assignment7;
 
 import java.util.ArrayList;
 
+import assignment7.MultiThreadServer.HandleAClient;
+
 public class User {
 	
+	private HandleAClient hac;
 	private String name;
 	private ArrayList<ChatRoom> chatRooms = new ArrayList<ChatRoom>();
 	private ArrayList<User> friends = new ArrayList<User>();
 
-	
-	User(String name){
-		this.setName(name);
+	public boolean isChattingWith(User u){
+		for (ChatRoom c : chatRooms){
+			if((c.getId() != 0) && c.hasUser(u)){
+				return true;
+			}
+		}
+		return false;
 	}
 	
-	public void addFriend(User u){
-		if (!friends.contains(u))
-			friends.add(u);			
+	User(String name, HandleAClient hac){
+		this.setName(name);
+		this.hac = hac;
+	}
+	
+	public HandleAClient getHandler(){
+		return hac;
 	}
 	
 	public void joinRoom(ChatRoom cr){

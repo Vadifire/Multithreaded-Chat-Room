@@ -9,6 +9,7 @@ import java.util.Observer;
 import java.util.Queue;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.event.EventHandler;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -124,7 +125,7 @@ public class Client extends Application {
 
 			new Reader(fromServer, chats).start();
 			globalChat.outbox.addObserver(new Writer(toServer, globalChat));
-			//globalChat.inbox.addObserver(new GuiHandler(globalChat));
+			// globalChat.inbox.addObserver(new GuiHandler(globalChat));
 		} catch (IOException e) {
 		}
 	}
@@ -144,10 +145,11 @@ public class Client extends Application {
 
 		@Override
 		public void update(Observable o, Object arg) {
-			Box out = (Box) o;
+			Box<String> out = (Box<String>) o;
 			while (!out.isEmpty()) {
 				try {
-					toServer.writeUTF(String.format("%04d", chat.chatID) + out.poll());
+					String message = out.poll();
+					toServer.writeUTF(message);
 					toServer.flush();
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -167,14 +169,20 @@ public class Client extends Application {
 		}
 
 		public void run() {
-			String message;
 			boolean done = false;
 			while (!done) {
 				try {
-					message = fromServer.readUTF();
-					int chatID = Integer.parseInt(message.substring(0, 3));
-					chats.get(chatID).addText(message.substring(4));
-					//inb.add(message.substring(4));
+					String message = fromServer.readUTF();
+					int chatID = Integer.parseInt(message.substring(0, 4));
+					if (!chats.containsKey(chatID))
+						Platform.runLater(() -> {
+							chats.put(chatID, new ChatWindow("ABBA", chatID));
+							chats.get(chatID).addText(message.substring(4));
+						});
+
+					System.out
+							.println("MESSAGES RECEIVED FROM SERVER: " + message + " AND ALSO " + message.substring(4));
+					// inb.add(message.substring(4));
 				} catch (Exception e) {
 					done = true;
 					e.printStackTrace();
@@ -182,25 +190,18 @@ public class Client extends Application {
 			}
 		}
 	}
-/*
-	class GuiHandler implements Observer {
-		ChatWindow chat;
 
-		public GuiHandler(ChatWindow chat) {
-			this.chat = chat;
-		}
-
-		@Override
-		public void update(Observable o, Object arg) {
-			Box inb = (Box) o;
-			String message = (String) arg;
-			while(!inb.isEmpty()){
-				chat.addText(message);
-			}
-		}
-
-	}
-*/
+	/*
+	 * class GuiHandler implements Observer { ChatWindow chat;
+	 * 
+	 * public GuiHandler(ChatWindow chat) { this.chat = chat; }
+	 * 
+	 * @Override public void update(Observable o, Object arg) { Box inb = (Box)
+	 * o; String message = (String) arg; while(!inb.isEmpty()){
+	 * chat.addText(message); } }
+	 * 
+	 * }
+	 */
 	class Box<T> extends Observable {
 		Queue<T> queue;
 
@@ -213,13 +214,14 @@ public class Client extends Application {
 		}
 
 		public T poll() {
-//			System.out.println("MESSAGE " + queue.peek() + " READ FROM INBOX");
+			// System.out.println("MESSAGE " + queue.peek() + " READ FROM
+			// INBOX");
 			return queue.poll();
 		}
 
 		public void add(T value) {
 			queue.add(value);
-//			System.out.println("MESSAGE " + value + " PUT IN OUTBOX");
+			// System.out.println("MESSAGE " + value + " PUT IN OUTBOX");
 			this.setChanged();
 			this.notifyObservers();
 		}
@@ -233,7 +235,6 @@ public class Client extends Application {
 		private TextField friendChat;
 		Box<String> inbox;
 		Box<String> outbox;
-		Box<String> friendRequests;
 		int chatID;
 		Label l;
 
@@ -258,6 +259,7 @@ public class Client extends Application {
 			TextField messageInput = new TextField();
 			messageArea.getChildren().add(messageInput);
 			content.getChildren().add(messageArea);
+			content.getChildren().add(friendChat);
 
 			scene = new Scene(content, 800, 400);
 			window = new Stage();
@@ -277,8 +279,13 @@ public class Client extends Application {
 
 			friendChat.setOnKeyPressed(new EventHandler<KeyEvent>() {
 				@Override
-				public void handle(KeyEvent arg0) {
-
+				public void handle(KeyEvent event) {
+					if (event.getCode() == KeyCode.ENTER) {
+						if (!friendChat.getText().equals("")) {
+							outbox.add("FRND" + friendChat.getText());
+						}
+						friendChat.setText("");
+					}
 				}
 			});
 
@@ -295,7 +302,7 @@ public class Client extends Application {
 				public void handle(KeyEvent event) {
 					if (event.getCode() == KeyCode.ENTER) {
 						if (!messageInput.getText().equals("")) {
-							outbox.add(chatID + messageInput.getText());
+							outbox.add(String.format("%04d", chatID) + messageInput.getText());
 						}
 						messageInput.setText("");
 					}
