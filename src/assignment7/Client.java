@@ -1,3 +1,15 @@
+/*
+ * EE422C Project 7 submission by
+ * <Ahsan Khan>
+ * <ajk2723>
+ * <16445>
+ * <Cedric Debelle>
+ * <cfd363>
+ * <16445>
+ * Slip days used: <1>
+ * Fall 2016
+ */
+
 package assignment7;
 
 import java.io.*;

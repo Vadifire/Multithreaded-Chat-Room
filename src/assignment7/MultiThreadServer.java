@@ -1,8 +1,19 @@
+/*
+ * EE422C Project 7 submission by
+ * <Ahsan Khan>
+ * <ajk2723>
+ * <16445>
+ * <Cedric Debelle>
+ * <cfd363>
+ * <16445>
+ * Slip days used: <1>
+ * Fall 2016
+ */
+
 package assignment7;
 
 import java.io.*;
 import java.net.*;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -31,6 +42,7 @@ public class MultiThreadServer extends Application { // Text area for displaying
 	// Number a client
 	private int clientNo = 0;
 
+	@SuppressWarnings("resource")
 	@Override // Override the start method in the Application class
 	public void start(Stage primaryStage) {
 		// Create a scene and place it in the stage
@@ -39,6 +51,15 @@ public class MultiThreadServer extends Application { // Text area for displaying
 		primaryStage.setTitle("MultiThreadServer"); // Set the stage title
 		primaryStage.setScene(scene); // Place the scene in the stage
 		primaryStage.show(); // Display the stage
+		primaryStage.setOnCloseRequest(new EventHandler<WindowEvent>(){
+
+			@Override
+			public void handle(WindowEvent arg0) {
+				// TODO Auto-generated method stub
+				System.exit(0);
+			}
+			
+		});
 
 		new Thread(() -> {
 			try { // Create a server socket
