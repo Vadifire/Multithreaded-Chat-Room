@@ -11,6 +11,7 @@ import java.util.Queue;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.event.EventHandler;
+import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -173,23 +174,31 @@ public class Client extends Application {
 			while (!done) {
 				try {
 					String message = fromServer.readUTF();
-					int chatID = Integer.parseInt(message.substring(0, 4));
-					System.out.println("chatID is: "+chatID);
-					if (!chats.containsKey(chatID)){
+					System.out.println("message from server: "+message);
+					if (message.substring(0,4).equals("LIST")){ //list command
+						System.out.println("List message: "+message);
+						int chatID = Integer.parseInt(message.substring(4, 8));
+						for (ChatWindow c: chats.values()){
+							System.out.println(c.chatID);
+						}
 						Platform.runLater( () -> {
-							ChatWindow newWindow = new ChatWindow("Private Chat", chatID, username);
-							chats.put(chatID, newWindow);
-							newWindow.outbox.addObserver(new Writer(toServer, newWindow));
-							chats.get(chatID).addText(message.substring(4));
+							chats.get(chatID).updateUserList(message.substring(8));
 						});
 					}
 					else{
-						System.out.println("adding text");
-						chats.get(chatID).addText(message.substring(4));
+						int chatID = Integer.parseInt(message.substring(0, 4));
+						if (!chats.containsKey(chatID)){
+							Platform.runLater( () -> {
+								ChatWindow newWindow = new ChatWindow("Private Chat", chatID, username);
+								chats.put(chatID, newWindow);
+								newWindow.outbox.addObserver(new Writer(toServer, newWindow));
+								chats.get(chatID).addText(message.substring(4));
+							});
+						}
+						else{
+							chats.get(chatID).addText(message.substring(4));
+						}
 					}
-					System.out
-							.println("MESSAGES RECEIVED FROM SERVER: " + message + " AND ALSO " + message.substring(4));
-					// inb.add(message.substring(4));
 				} catch (Exception e) {
 					done = true;
 					e.printStackTrace();
@@ -239,6 +248,7 @@ public class Client extends Application {
 		private Scene scene;
 		private HBox content;
 		private TextArea ta;
+		private TextArea userArea;
 		private TextField friendChat;
 		Box<String> inbox;
 		Box<String> outbox;
@@ -249,31 +259,78 @@ public class Client extends Application {
 		public void addText(String message) {
 			ta.appendText(message + "\n");
 		}
+		
+		public void updateUserList(String users){
+			userArea.clear();
+			userArea.appendText(users);
+		}
 
 		public ChatWindow(String name, int ID, String username) {
-			friendChat = new TextField("Chat With...");
+			friendChat = new TextField("Enter Username...");
 			inbox = new Box<String>();
 			outbox = new Box<String>();
 			this.chatID = ID;
 			this.username = username;
 
 			ta = new TextArea();
+			userArea = new TextArea();
 			content = new HBox();
 			VBox messageArea = new VBox();
+			VBox friendArea = new VBox();
 
 			ta.setEditable(false);
+			userArea.setEditable(false);
 			ScrollPane scrollPane = new ScrollPane(ta);
 			scrollPane.setHbarPolicy(ScrollBarPolicy.NEVER);
+			
+			ScrollPane userList = new ScrollPane(userArea);
+			userList.setHbarPolicy(ScrollBarPolicy.NEVER);
+
 			messageArea.getChildren().add(scrollPane);
 			TextField messageInput = new TextField();
+			messageArea.getChildren().add(new Label("Enter Message:"));
 			messageArea.getChildren().add(messageInput);
-			content.getChildren().add(messageArea);
-			content.getChildren().add(friendChat);
+			friendArea.getChildren().add(new Label("Start New Chat With:"));
+			friendArea.getChildren().add(friendChat);
+			friendArea.getChildren().add(new Label("Users In Room:"));
+			friendArea.getChildren().add(userList);
+			
+			if (ID != 0){//not global chat, allow invitation
+				TextField groupChat = new TextField("Enter Username...");
+				friendArea.getChildren().add(new Label("Invite To This Chat:"));
+				friendArea.getChildren().add(groupChat);
+				
+				groupChat.setOnKeyPressed(new EventHandler<KeyEvent>() {
+					@Override
+					public void handle(KeyEvent event) {
+						if (event.getCode() == KeyCode.ENTER) {
+							if (!groupChat.getText().equals("")) {
+								outbox.add("INVT"+String.format("%04d", chatID) +groupChat.getText());
+							}
+							groupChat.setText("");
+						}
+					}
+				});
+				groupChat.setOnMouseClicked(new EventHandler<MouseEvent>() {
 
-			scene = new Scene(content, 660, 330);
+					@Override
+					public void handle(MouseEvent event) {
+						groupChat.setText("");
+					}
+				});			
+			}
+			content.getChildren().add(messageArea);
+			content.getChildren().add(friendArea);
+			content.setPadding(new Insets(10,10,10,10));
+			friendArea.setPadding(new Insets(10,10,10,10));
+			messageArea.setPadding(new Insets(10,10,10,10));
+
+
+			scene = new Scene(content, 650, 250);
 			window = new Stage();
+			window.setResizable(false);
 			window.setScene(scene);
-			window.setTitle(name);
+			window.setTitle(name+" - "+username);
 			window.setX(10);
 			window.setY(10);
 			window.show();
@@ -282,6 +339,7 @@ public class Client extends Application {
 				@Override
 				public void handle(WindowEvent arg0) {
 					outbox.add("EXIT"+String.format("%04d", chatID) + username+ " has left the room.");
+					chats.remove(ID);
 					window.hide();
 				}
 
@@ -298,7 +356,6 @@ public class Client extends Application {
 					}
 				}
 			});
-
 			friendChat.setOnMouseClicked(new EventHandler<MouseEvent>() {
 
 				@Override

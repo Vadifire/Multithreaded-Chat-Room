@@ -92,35 +92,54 @@ public class MultiThreadServer extends Application { // Text area for displaying
 				String username = inputFromClient.readUTF();
 				user = new User(username, this);
 				users.put(username, user);
-				globalChat.addObserver(this);
-				user.joinRoom(globalChat);
+				globalChat.addUser(user, this);
 				outputToClient.writeInt(globalChat.getId());
-
 				globalChat.postMessage(inputFromClient.readUTF());
+				
+				globalChat.postMessage("LIST"+String.format("%04d", globalChat.getId())+globalChat.getUserList());
+
 				// Continuously serve the client
 				while (true) {
 					String messageReceived = inputFromClient.readUTF();
 					String code = messageReceived.substring(0, 4);
 					String value = messageReceived.substring(4);
 					
-					if (code.equals("FRND")) {						
+					if (code.equals("FRND")) {		//create new private chat				
 						if(users.containsKey(value)){
 							User u = users.get(value);
-							if(!(u.isChattingWith(this.user))){
+							if(!u.getName().equals(user.getName()) && !(u.isChattingWith(this.user))){
 								ChatRoom chat = new ChatRoom();
 								chat.addUser(u, u.getHandler());
 								chat.addUser(this.user, this);
 								chatRooms.put(chat.getId(), chat);
-								chat.postMessage("Say hello, " + user.getName() + " and " + u.getName() + "!");
+								chat.postMessage("Say hello, " + user.getName() + " and " + u.getName() + "!");			
+								chat.postMessage("LIST"+String.format("%04d", chat.getId())+chat.getUserList());
 							}
 						}
-					} else if (code.equals("EXIT")) {						
+					} else if (code.equals("INVT")) {	//invite user to existing private chat		
+						System.out.println("Invite");
+						value = messageReceived.substring(8);
+						System.out.println("Value: "+value);
+						if(users.containsKey(value)){
+							User u = users.get(value);
+							code = messageReceived.substring(4,8); //extracts room code
+							ChatRoom c = chatRooms.get(Integer.parseInt(code));
+							System.out.println("ChatID:" +Integer.parseInt(code));
+							if (!u.isInRoom(c)){
+								System.out.println("Adding to room..."+u.getName());
+								c.addUser(u, u.getHandler());
+								c.postMessage(u.getName()+" has joined the room.");
+								c.postMessage("LIST"+String.format("%04d",c.getId())+c.getUserList());
+							}
+						}
+					} else if (code.equals("EXIT")) {		//close window				
 						code = messageReceived.substring(4,8); //extracts room code
-						value = messageReceived.substring(8); //value gets shifted as well
+						value = messageReceived.substring(8);
 						ChatRoom c = chatRooms.get(Integer.parseInt(code));
 						User u = users.get(value);
 						c.removeUser(this.user, this);
 						c.postMessage(value);
+						c.postMessage("LIST"+String.format("%04d", c.getId())+c.getUserList());
 					} else {
 						ChatRoom c = chatRooms.get(Integer.parseInt(code));
 						c.postMessage(String.format("(%tT) ", Calendar.getInstance()) + user.getName() + ": "
@@ -140,8 +159,13 @@ public class MultiThreadServer extends Application { // Text area for displaying
 			int chatId = ((ChatRoom) arg0).getId();
 			String newMessage = (String) arg1;
 			try {
-				outputToClient.writeUTF(String.format("%04d", chatId) + newMessage);
-				System.out.println("MESSAGES SENT FROM SERVER: "+ newMessage + " AND ALSO " + String.format("%04d", chatId) + newMessage);
+				if (newMessage.length() > 3 && newMessage.substring(0, 4).equals("LIST")){
+					outputToClient.writeUTF(newMessage); //No need to append chatID at start
+				}
+				else{
+					outputToClient.writeUTF(String.format("%04d", chatId) + newMessage);
+				}
+				//System.out.println("MESSAGES SENT FROM SERVER: "+ newMessage + " AND ALSO " + String.format("%04d", chatId) + newMessage);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

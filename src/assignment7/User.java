@@ -11,6 +11,10 @@ public class User {
 	private ArrayList<ChatRoom> chatRooms = new ArrayList<ChatRoom>();
 	private ArrayList<User> friends = new ArrayList<User>();
 
+	public boolean isInRoom(ChatRoom c){
+		return chatRooms.contains(c);
+	}
+	
 	public boolean isChattingWith(User u){
 		for (ChatRoom c : chatRooms){
 			if((c.getId() != 0) && c.hasUser(u)){

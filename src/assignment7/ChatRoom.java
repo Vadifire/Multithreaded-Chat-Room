@@ -16,6 +16,14 @@ public class ChatRoom extends Observable{
 		id = nextId++;
 	}
 	
+	public String getUserList(){
+		String ret = "";
+		for (User u: users){
+			ret+=u.getName()+"\n";
+		}
+		return ret;
+	}
+	
 	public boolean hasUser(User u){
 		return users.contains(u);
 	}
